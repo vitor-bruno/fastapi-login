@@ -1,7 +1,18 @@
-from tortoise.contrib.pydantic import pydantic_model_creator
-from app.models import Usuario
+from pydantic import BaseModel, EmailStr
 
 
-Usuario_Pydantic = pydantic_model_creator(Usuario, name='Usuario')
+class BaseUsuario(BaseModel):
+    email: EmailStr
+    senha_hash: str
 
-UsuarioIn_Pydantic = pydantic_model_creator(Usuario, name='UsuarioIn', exclude_readonly=True)
+
+class CriarUsuario(BaseUsuario):
+    pass
+
+
+class UsuarioPy(BaseUsuario):
+    id: int
+    ativo: bool = True
+
+    class Config:
+        orm_mode = True

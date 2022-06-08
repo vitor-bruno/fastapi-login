@@ -5,7 +5,7 @@ from passlib.hash import bcrypt
 
 class Usuario(Model):
     id = fields.IntField(pk=True)
-    nome_de_usuario = fields.CharField(50, unique=True)
+    email = fields.CharField(50, unique=True)
     senha_hash = fields.CharField(128)
     ativo = fields.BooleanField(default=True)
 
