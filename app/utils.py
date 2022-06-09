@@ -1,15 +1,15 @@
-import jwt
-import emails
-from typing import Any, Dict
-from emails.template import JinjaTemplate
 from datetime import datetime, timedelta
-from fastapi import Depends, HTTPException, status
+from typing import Any, Dict
+
+import emails
+import jwt
 from decouple import config
+from emails.template import JinjaTemplate
+from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
-from app.models import Usuario
-from app.schemas import UsuarioPy
-
+from app.models import User
+from app.schemas import UserPydantic
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='login')
 
@@ -17,45 +17,62 @@ JWT_SECRET = config('JWT_SECRET')
 ALGORITHM = "HS256"
 
 
-async def autenticar_usuario(email: str, senha: str):
-    usuario = await Usuario.get(email=email)
+async def authenticated_user(email: str, password: str):
+    user = await User.get(email=email)
     
-    if not usuario:
+    if not user:
         return False
     
-    if not usuario.senha_valida(senha):
+    if not user.valid_password(password):
         return False
 
-    return usuario
+    return user
 
 
-async def usuario_ativo(token: str = Depends(oauth2_scheme)):
+async def active_user(token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=ALGORITHM)
-        usuario = await Usuario.get(id=payload.get('id'))
+        user = await User.get(id=payload.get('id'))
     
     except:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Credenciais incorretas')
     
-    if not usuario.ativo:
+    if not user.active_user:
         raise HTTPException(status_code=400, detail="Usuário inativo")
 
-    return UsuarioPy.from_orm(usuario)
+    return UserPydantic.from_orm(user)
 
 
-def token_de_acesso(usuario_dict: dict, tempo_token: timedelta):
-    dados = usuario_dict.copy()
+def access_token(user_dict: dict, token_exp: timedelta):
+    data = user_dict.copy()
     
-    dados.update({"exp" : datetime.utcnow() + tempo_token})
+    data.update({"exp" : datetime.utcnow() + token_exp})
 
-    token = jwt.encode(dados, JWT_SECRET, algorithm=ALGORITHM)
+    token = jwt.encode(data, JWT_SECRET, algorithm=ALGORITHM)
     
     return token
 
 
-def enviar_email(destinatario: str, assunto: str = "", template: str = "", contexto: Dict[str, Any] = {}):
-    mensagem = emails.Message(
-        subject=JinjaTemplate(assunto),
+def password_reset_token(email: str):
+    delta = timedelta(hours=48)
+    now = datetime.utcnow()
+    exp = (now + delta).timestamp()
+
+    token = jwt.encode({"exp": exp, "nbf": now, "sub": email}, JWT_SECRET, algorithm=ALGORITHM)
+    return token
+
+
+def verify_password_reset_token(token: str):
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=ALGORITHM)
+        return payload.get("sub")
+    except:
+        return None
+
+
+def send_email(email_to: str, subject: str = "", template: str = "", context: Dict[str, Any] = {}):
+    message = emails.Message(
+        subject=JinjaTemplate(subject),
         html=JinjaTemplate(template),
         mail_from=("Vitor Bruno", "vbruno0110@gmail.com"),
     )
@@ -68,41 +85,24 @@ def enviar_email(destinatario: str, assunto: str = "", template: str = "", conte
         "tls" : True
         }
 
-    mensagem.send(to=destinatario, render=contexto, smtp=smtp_options)
+    message.send(to=email_to, render=context, smtp=smtp_options)
 
 
-def gerar_token_de_redefinicao_de_senha(email: str):
-    delta = timedelta(hours=48)
-    now = datetime.utcnow()
-    exp = (now + delta).timestamp()
+def send_password_reset_email(email_to: str, email: str, token: str):
+    subject = f"Redefinição de senha para o usuário {email}"
 
-    token = jwt.encode({"exp": exp, "nbf": now, "sub": email}, config('JWT_SECRET'), algorithm="HS256")
-    return token
-
-
-def enviar_email_de_redefinicao_de_senha(destinatario: str, email: str, token: str):
-    assunto = f"Redefinição de senha para o usuário {email}"
-
-    with open("app/templates/redefinicao_senha.html") as f:
+    with open("app/templates/password_reset.html") as f:
         template_str = f.read()
 
     link = f"http://127.0.0.1:8000/alterar-senha?token={token}"
     
-    enviar_email(
-        destinatario=destinatario,
-        assunto=assunto,
+    send_email(
+        email_to=email_to,
+        subject=subject,
         template=template_str,
-        contexto={
+        context={
             "email": email,
             "valid_hours": 48,
             "link": link,
         },
     )
-
-
-def verificar_token_de_senha(token: str):
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=ALGORITHM)
-        return payload.get("sub")
-    except:
-        return None

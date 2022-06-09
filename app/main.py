@@ -7,95 +7,95 @@ from tortoise.contrib.fastapi import register_tortoise
 from typing import List
 
 from app.utils import (
-    autenticar_usuario,
-    usuario_ativo,
-    token_de_acesso,
-    enviar_email_de_redefinicao_de_senha,
-    gerar_token_de_redefinicao_de_senha,
-    verificar_token_de_senha
+    authenticated_user,
+    active_user,
+    access_token,
+    send_password_reset_email,
+    password_reset_token,
+    verify_password_reset_token
     )
     
-from app.models import Usuario
-from app.schemas import UsuarioPy, CriarUsuario
+from app.models import User
+from app.schemas import UserPydantic, CreateUser
 
 
 app = FastAPI()
 
 
 @app.post('/login')
-async def gerar_token_de_acesso(form_data: OAuth2PasswordRequestForm = Depends()):
-    usuario = await autenticar_usuario(form_data.username, form_data.password)
+async def get_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = await authenticated_user(form_data.username, form_data.password)
 
-    if not usuario:
+    if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Credenciais incorretas')
 
-    usuario_obj = UsuarioPy.from_orm(usuario)
-    tempo_token = timedelta(minutes=30)
+    user_obj = UserPydantic.from_orm(user)
+    token_exp = timedelta(minutes=30)
 
-    token = token_de_acesso(usuario_obj.dict(), tempo_token)
+    token = access_token(user_obj.dict(), token_exp)
 
     return {'access_token' : token, 'token_type' : 'bearer'}
 
 
-@app.post('/cadastro', response_model=UsuarioPy)
-async def registrar_usuario(usuario: CriarUsuario):
-    usuario_obj = Usuario(email=usuario.email, senha_hash=bcrypt.hash(usuario.senha_hash))
+@app.post('/signup', response_model=UserPydantic)
+async def register_new_user(user: CreateUser):
+    user_obj = User(email=user.email, hash_password=bcrypt.hash(user.hash_password))
 
-    await usuario_obj.save()
+    await user_obj.save()
 
-    return UsuarioPy.from_orm(usuario_obj)
+    return UserPydantic.from_orm(user_obj)
 
 
-@app.post('/redefinicao-de-senha/{email}')
-async def enviar_email_para_redefinir_senha(email: str):
-    usuario = await Usuario.get(email=email)
+@app.post('/forgot-my-password/{email}')
+async def send_token_for_password_reset(email: str):
+    user = await User.get(email=email)
 
-    if not usuario:
+    if not user:
         raise HTTPException(
             status_code=404,
             detail="Usuário não encontrado no banco de dados.",
         )
 
-    token = gerar_token_de_redefinicao_de_senha(email=email)
+    token = password_reset_token(email=email)
 
-    enviar_email_de_redefinicao_de_senha(destinatario=usuario.email, email=email, token=token)
+    send_password_reset_email(email_to=user.email, email=email, token=token)
 
     return {'msg': 'Email de redefinição de senha enviado com sucesso.'}
 
 
-@app.post('/alterar-senha')
-async def redefinir_senha_com_token(token: str, nova_senha: str):
-    email = verificar_token_de_senha(token)
+@app.post('/password-reset')
+async def password_reset_from_token(token: str, new_password: str):
+    email = verify_password_reset_token(token)
 
     if not email:
         raise HTTPException(status_code=400, detail="Token Inválido")
 
-    usuario = await Usuario.get(email=email)
+    user = await User.get(email=email)
 
-    if not usuario:
+    if not user:
         raise HTTPException(
             status_code=404,
             detail="Usuário não encontrado no banco de dados.",
         )
     
-    if not usuario.ativo:
+    if not user.active_user:
         raise HTTPException(status_code=400, detail="Usuário inativo")
 
-    senha_hash = bcrypt.hash(nova_senha)
-    usuario.senha_hash = senha_hash
-    await usuario.save()
+    hash_password = bcrypt.hash(new_password)
+    user.hash_password = hash_password
+    await user.save()
     return {"msg": "Senha atualizada com sucesso"}
 
 
-@app.get('/usuarios', response_model=List[UsuarioPy])
-async def ver_usuarios_cadastrados(skip: int = 0, limit: int = 100, usuario_logado: UsuarioPy = Depends(usuario_ativo)):
-    usuarios = await Usuario.all().offset(skip).limit(limit)
-    return usuarios
+@app.get('/users', response_model=List[UserPydantic])
+async def get_registered_users(skip: int = 0, limit: int = 100, active_user: UserPydantic = Depends(active_user)):
+    users = await User.all().offset(skip).limit(limit)
+    return users
 
 
-@app.get('/usuario-logado', response_model=UsuarioPy)
-async def ver_usuario_logado(usuario_logado: UsuarioPy = Depends(usuario_ativo)):
-    return usuario_logado
+@app.get('/users/me', response_model=UserPydantic)
+async def get_current_user(active_user: UserPydantic = Depends(active_user)):
+    return active_user
 
 
 register_tortoise(

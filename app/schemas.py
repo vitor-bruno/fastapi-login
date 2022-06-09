@@ -1,18 +1,18 @@
 from pydantic import BaseModel, EmailStr
 
 
-class BaseUsuario(BaseModel):
+class BaseUser(BaseModel):
     email: EmailStr
-    senha_hash: str
+    hash_password: str
 
 
-class CriarUsuario(BaseUsuario):
+class CreateUser(BaseUser):
     pass
 
 
-class UsuarioPy(BaseUsuario):
+class UserPydantic(BaseUser):
     id: int
-    ativo: bool = True
+    active_user: bool = True
 
     class Config:
         orm_mode = True

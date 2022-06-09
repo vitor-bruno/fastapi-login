@@ -3,11 +3,11 @@ from tortoise import fields
 from passlib.hash import bcrypt
 
 
-class Usuario(Model):
+class User(Model):
     id = fields.IntField(pk=True)
     email = fields.CharField(50, unique=True)
-    senha_hash = fields.CharField(128)
-    ativo = fields.BooleanField(default=True)
+    hash_password = fields.CharField(128)
+    active_user = fields.BooleanField(default=True)
 
-    def senha_valida(self, senha):
-        return bcrypt.verify(senha, self.senha_hash)
+    def valid_password(self, senha):
+        return bcrypt.verify(senha, self.hash_password)
