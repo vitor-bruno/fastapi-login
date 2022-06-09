@@ -1,8 +1,10 @@
+from fastapi.middleware.cors import CORSMiddleware
 from datetime import timedelta
 from decouple import config
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from passlib.hash import bcrypt
+from tortoise import Tortoise
 from tortoise.contrib.fastapi import register_tortoise
 from typing import List
 
@@ -20,6 +22,14 @@ from app.schemas import UserPydantic, CreateUser
 
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["fastapi-login.herokuapp.com", "127.0.0.1:8000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 
 @app.post('/login')
@@ -98,9 +108,10 @@ async def get_current_user(active_user: UserPydantic = Depends(active_user)):
     return active_user
 
 
+Tortoise.init_models(["app.models"], "models")
 register_tortoise(
     app,
-    db_url = config('DATABASE_URL'),
+    db_url = config('HEROKU_POSTGRESQL_BROWN_URL'),
     modules = {'models' : ['app.models']},
     generate_schemas = True,
     add_exception_handlers = True
