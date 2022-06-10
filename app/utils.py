@@ -85,7 +85,9 @@ def send_email(email_to: str, subject: str = "", template: str = "", context: Di
         "tls" : True
         }
 
-    message.send(to=email_to, render=context, smtp=smtp_options)
+    response = message.send(to=email_to, render=context, smtp=smtp_options)
+
+    return response
 
 
 def send_password_reset_email(email_to: str, email: str, token: str):
@@ -96,7 +98,7 @@ def send_password_reset_email(email_to: str, email: str, token: str):
 
     link = f"http://127.0.0.1:8000/alterar-senha?token={token}"
     
-    send_email(
+    response = send_email(
         email_to=email_to,
         subject=subject,
         template=template_str,
@@ -106,3 +108,5 @@ def send_password_reset_email(email_to: str, email: str, token: str):
             "link": link,
         },
     )
+
+    return response

@@ -68,9 +68,12 @@ async def send_token_for_password_reset(email: str):
 
     token = password_reset_token(email=email)
 
-    send_password_reset_email(email_to=user.email, email=email, token=token)
+    r = send_password_reset_email(email_to=user.email, email=email, token=token)
 
-    return {'msg': 'Email de redefinição de senha enviado com sucesso.'}
+    if r.status_code == 250:
+        return {'msg': 'Email de redefinição de senha enviado com sucesso.'}
+    else:
+        return {'msg': r.status_code}
 
 
 @app.post('/password-reset')
