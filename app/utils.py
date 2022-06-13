@@ -1,12 +1,11 @@
 from datetime import datetime, timedelta
-from typing import Any, Dict
+from pathlib import Path
 
-import emails
 import jwt
 from decouple import config
-from emails.template import JinjaTemplate
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from fastapi_mail import ConnectionConfig, FastMail, MessageSchema
 
 from app.models import User
 from app.schemas import UserPydantic
@@ -70,43 +69,28 @@ def verify_password_reset_token(token: str):
         return None
 
 
-def send_email(email_to: str, subject: str = "", template: str = "", context: Dict[str, Any] = {}):
-    message = emails.Message(
-        subject=JinjaTemplate(subject),
-        html=JinjaTemplate(template),
-        mail_from=("Vitor Bruno", "vbruno0110@gmail.com"),
+async def send_password_reset_email(email_to: str, email: str, token: str):
+    conf = ConnectionConfig(
+        MAIL_USERNAME=config('SMTP_USER'),
+        MAIL_FROM=config('SMTP_USER'),
+        MAIL_PASSWORD=config('SMTP_PASSWORD'),
+        MAIL_PORT=config('SMTP_PORT'),
+        MAIL_SERVER=config('SMTP_HOST'),
+        MAIL_TLS=True,
+        MAIL_SSL=False,
+        TEMPLATE_FOLDER = Path(__file__).parent / 'templates'
     )
-
-    smtp_options = {
-        "host": config('SMTP_HOST'),
-        "port": config('SMTP_PORT'),
-        "user" : config('SMTP_USER'),
-        "password" : config('SMTP_PASSWORD'),
-        "tls" : True
-        }
-
-    response = message.send(to=email_to, render=context, smtp=smtp_options)
-
-    return response
-
-
-def send_password_reset_email(email_to: str, email: str, token: str):
-    subject = f"Redefinição de senha para o usuário {email}"
-
-    with open("app/templates/password_reset.html") as f:
-        template_str = f.read()
-
-    link = f"http://127.0.0.1:8000/alterar-senha?token={token}"
     
-    response = send_email(
-        email_to=email_to,
-        subject=subject,
-        template=template_str,
-        context={
+    mensagem = MessageSchema(
+       subject=f"Redefinição de senha para o usuário {email}",
+       recipients=[email_to],
+       template_body={
             "email": email,
             "valid_hours": 48,
-            "link": link,
+            "token": token,
         },
-    )
-
-    return response
+       subtype="html"
+       )
+    
+    fm = FastMail(conf)
+    await fm.send_message(mensagem, template_name='password_reset.html')

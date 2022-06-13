@@ -56,7 +56,7 @@ async def register_new_user(user: CreateUser):
     return UserPydantic.from_orm(user_obj)
 
 
-@app.post('/forgot-my-password/{email}')
+@app.post('/forgot-password/{email}')
 async def send_token_for_password_reset(email: str):
     user = await User.get(email=email)
 
@@ -68,15 +68,12 @@ async def send_token_for_password_reset(email: str):
 
     token = password_reset_token(email=email)
 
-    r = send_password_reset_email(email_to=user.email, email=email, token=token)
+    await send_password_reset_email(email_to=user.email, email=email, token=token)
 
-    if r.status_code == 250:
-        return {'msg': 'Email de redefinição de senha enviado com sucesso.'}
-    else:
-        return {'msg': r.status_code}
+    return {"mensagem" : "Email enviado com sucesso"}
 
 
-@app.post('/password-reset')
+@app.post('/reset-password')
 async def password_reset_from_token(token: str, new_password: str):
     email = verify_password_reset_token(token)
 
