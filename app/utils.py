@@ -7,8 +7,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema
 
-from app.models import User
-from app.schemas import UserPydantic
+from .models import User
+from .schemas import UserPydantic
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='login')
 
@@ -81,7 +81,7 @@ async def send_password_reset_email(email_to: str, email: str, token: str):
         TEMPLATE_FOLDER = Path(__file__).parent / 'templates'
     )
     
-    mensagem = MessageSchema(
+    message = MessageSchema(
        subject=f"Redefinição de senha para o usuário {email}",
        recipients=[email_to],
        template_body={
@@ -93,4 +93,4 @@ async def send_password_reset_email(email_to: str, email: str, token: str):
        )
     
     fm = FastMail(conf)
-    await fm.send_message(mensagem, template_name='password_reset.html')
+    await fm.send_message(message, template_name='password_reset.html')

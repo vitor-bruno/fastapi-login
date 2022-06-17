@@ -8,7 +8,7 @@ from tortoise import Tortoise
 from tortoise.contrib.fastapi import register_tortoise
 from typing import List
 
-from app.utils import (
+from .utils import (
     authenticated_user,
     active_user,
     access_token,
@@ -17,8 +17,8 @@ from app.utils import (
     verify_password_reset_token
     )
     
-from app.models import User
-from app.schemas import UserPydantic, CreateUser
+from .models import User
+from .schemas import UserPydantic, CreateUser
 
 
 app = FastAPI()
@@ -111,7 +111,7 @@ async def get_current_user(active_user: UserPydantic = Depends(active_user)):
 Tortoise.init_models(["app.models"], "models")
 register_tortoise(
     app,
-    db_url = config('HEROKU_POSTGRESQL_BROWN_URL'),
+    db_url = config('DATABASE_URL'),
     modules = {'models' : ['app.models']},
     generate_schemas = True,
     add_exception_handlers = True
